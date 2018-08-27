@@ -1,13 +1,18 @@
 <?php
+
 namespace Lemming\Imageoptimizer;
 
+use TYPO3\CMS\Core\Imaging\GraphicalFunctions;
+use TYPO3\CMS\Core\Resource\Driver\DriverInterface;
 use TYPO3\CMS\Core\Resource\FileInterface;
 use TYPO3\CMS\Core\Resource\Folder;
+use TYPO3\CMS\Core\Resource\ProcessedFile;
+use TYPO3\CMS\Core\Resource\ProcessedFileRepository;
+use TYPO3\CMS\Core\Resource\Service\FileProcessingService;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class FileAspects
 {
-
     /**
      * @var OptimizeImageService
      */
@@ -45,15 +50,47 @@ class FileAspects
     /**
      * Called when a file was processed
      *
-     * @param \TYPO3\CMS\Core\Resource\Service\FileProcessingService $fileProcessingService
-     * @param \TYPO3\CMS\Core\Resource\Driver\DriverInterface $driver
-     * @param \TYPO3\CMS\Core\Resource\ProcessedFile $processedFile
+     * @param FileProcessingService $fileProcessingService
+     * @param DriverInterface $driver
+     * @param ProcessedFile $processedFile
+     *
+     * @throws BinaryNotFoundException
      */
     public function processFile($fileProcessingService, $driver, $processedFile)
     {
-        if ($processedFile->isUpdated() === true) {
-            // ToDo: Find better possibility for getPublicUrl()
-            $this->service->process(PATH_site . $processedFile->getPublicUrl(), $processedFile->getExtension());
+        if ( ! $processedFile->isUpdated()) {
+            return;
         }
+
+        if ($processedFile->usesOriginalFile()) {
+            $this->processOriginalFile($processedFile);
+        }
+
+        $this->service->process(PATH_site . $processedFile->getPublicUrl(), $processedFile->getExtension());
+    }
+
+    /**
+     * @param ProcessedFile $processedFile
+     */
+    protected function processOriginalFile($processedFile)
+    {
+        $localCopy = $processedFile->getForLocalProcessing();
+
+        $imageDimensions = GeneralUtility::makeInstance(GraphicalFunctions::class)
+            ->getImageDimensions($localCopy);
+        $properties = [
+            'width' => $imageDimensions[0],
+            'height' => $imageDimensions[1],
+            'size' => filesize($localCopy),
+            'checksum' => $processedFile->getTask()->getConfigurationChecksum()
+        ];
+
+        $processedFile->updateProperties($properties);
+        $processedFile->setName($processedFile->getTask()->getTargetFileName());
+        $processedFile->updateWithLocalFile($localCopy);
+        $processedFile->getTask()->setExecuted(true);
+
+        $processedFileRepository = GeneralUtility::makeInstance(ProcessedFileRepository::class);
+        $processedFileRepository->add($processedFile);
     }
 }

@@ -1,7 +1,6 @@
 <?php
 namespace Lemming\Imageoptimizer;
 
-use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Log\Logger;
 use TYPO3\CMS\Core\Log\LogLevel;
@@ -29,17 +28,13 @@ class OptimizeImageService
     protected $logger;
 
     /**
-     * @var array
-     */
-    protected $configuration;
-
-    /**
      * Initialize
      */
     public function __construct()
     {
-        $this->configuration = GeneralUtility::makeInstance(ExtensionConfiguration::class)->get('imageoptimizer');
+        $this->configuration = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['imageoptimizer']);
         $this->logger = GeneralUtility::makeInstance(LogManager::class)->getLogger(__CLASS__);
+
     }
 
     /**
